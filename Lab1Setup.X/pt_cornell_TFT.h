@@ -57,12 +57,15 @@
 #define __PT_H__
 
 #include "lc.h"
+#define _SUPPRESS_PLIB_WARNING 1
+#include "plib.h"
 
 struct pt {
   lc_t lc;
   int pri;
 };
 
+#define SYS_FREQ 64000000
 #define PT_WAITING 0
 #define PT_YIELDED 1
 #define PT_EXITED  2

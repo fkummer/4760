@@ -18,6 +18,10 @@
                    displayName="Source Files"
                    projectFiles="true">
       <itemPath>fakemain.c</itemPath>
+      <itemPath>Lab1Config.c</itemPath>
+      <itemPath>glcdfont_1.c</itemPath>
+      <itemPath>tft_gfx_1.c</itemPath>
+      <itemPath>tft_master_1.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"

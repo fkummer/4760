@@ -1,4 +1,4 @@
-build/default/production/fakemain.o:  \
+build/default/debug/fakemain.o:  \
 fakemain.c  \
 pt_cornell_TFT.h  \
 lc.h  \
