@@ -7,7 +7,7 @@ void capTimerSetup(){
   // timer 2: off,  no interrupts, internal clock, prescalar 32,
   // ticks once/microsec!
   // set up to count millsec 32 MHz/32 = 1 MHz
-  OpenTimer2(T2_ON  | T2_SOURCE_INT | T2_PS_1_32 , 0);
+  OpenTimer2(T2_ON  | T2_SOURCE_INT | T2_PS_1_32 , 60000);
   // set up the timer interrupt with a priority of 2
   ConfigIntTimer2(T2_INT_OFF | T2_INT_PRIOR_2);
   mT2ClearIntFlag(); // and clear the interrupt flag

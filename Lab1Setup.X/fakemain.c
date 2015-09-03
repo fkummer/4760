@@ -23,51 +23,57 @@
 #define VDD 3.3
 #define DISCHARGE_TIME 1000  // 1msec
 
-#define RESISTOR 470000
+#define RESISTOR 1075000
 #define VREF 1.2
 
 void capacitor(void);
 
 volatile int charged;
-float charge_time;
-float capacitance;
+volatile float charge_time;
+float capacitance = 0.0;
 
 static struct pt pt_cap, pt_blink, pt_cap_read;
 //string buffer
 char buffer[60];
-static int xc=225, yc=10;
+static int xc=310, yc=230;
 
 static PT_THREAD(protothread_cap(struct pt *pt)){
     PT_BEGIN(pt);
         
     while(1){
             // Discharge Capacitor
-
+        
         // Set pin as output
         mPORTBSetPinsDigitalOut(BIT_3);    
         //Drive RB3 low
         mPORTBClearBits(BIT_3);
 
         // Yield until discharge is complete
-        PT_YIELD_TIME_msec(1);
+        PT_YIELD_TIME_msec(2);
+        Comp1Setup();
     // Charge Capacitor
 
         mPORTBSetPinsDigitalIn(BIT_3); 
         capTimerSetup();
+        IC1setup();
         // Yield while waiting for event from comparator
         PT_YIELD_UNTIL(pt, charged);
-        charge_time = mIC1ReadCapture();
+        CloseTimer2();
+        
+        
         charged = 0;
 
-        // Calculate capacitance
-        capacitance = 1000000000000000 * ((log(1-(VREF / VDD)) * RESISTOR) / charge_time);
+        // Calculate capacitance in nanofarads
+        capacitance =  (((charge_time*-1)/1000000)/(log(1-(VREF / VDD)) * RESISTOR))*1000000000;
 
-        if(capacitance < 1){
-            capacitance = 0;
-        }  // Check if capacitance is non present
-        else if(capacitance > 100){
-            capacitance = 999;
-        }  // Check if capacitance is out of range
+//        if(capacitance < 1){
+//            capacitance = 0;
+//        }  // Check if capacitance is non present
+//        else if(capacitance > 100){
+//            capacitance = 999;
+//        }  // Check if capacitance is out of range
+        CMP1Close();
+        PT_YIELD_TIME_msec(20);
     }
     PT_END(pt);
 }
@@ -94,22 +100,20 @@ static PT_THREAD(protothread_cap_read(struct pt *pt)) {
     PT_BEGIN(pt);
     tft_setCursor(0,0);
     tft_setTextColor(ILI9340_WHITE);
-    tft_setTextSize(1);
-    tft_writeString("Measuring capacitance:\n"); 
+    tft_setTextSize(2);
+    tft_writeString("Measuring capacitance:"); 
         while(1) {
             tft_setCursor(0,30);
             tft_setTextColor(ILI9340_YELLOW);
             tft_setTextSize(2);
-            if (capacitance == 0) {
-                tft_writeString("No capacitor detected");
-            }
-            else if (capacitance == 999) {
-                tft_writeString("Capacitor out of range!");
-            }
-            else {
-                sprintf(buffer, "%5.1f", capacitance);
-            }
-            tft_writeString(buffer); 
+            //if (capacitance < 1 || capacitance > 99) {
+                //tft_writeString("Capacitor out of range!");
+            //}
+            //else {
+                tft_fillRoundRect(0,30, 320, 40, 1, ILI9340_BLACK);// x,y,w,h,radius,color
+                sprintf(buffer, "%4.1f", capacitance);
+                tft_writeString(buffer); 
+            //}
             PT_YIELD_TIME_msec(200);
         }
     PT_END(pt);
@@ -131,18 +135,22 @@ int main(int argc, char** argv) {
     tft_begin();
     tft_fillScreen(ILI9340_BLACK);
     
-    tft_setRotation(0);
-    
+    tft_setRotation(1);
+    PerPinSetup();
     while(1){
         PT_SCHEDULE(protothread_blink(&pt_blink));
         PT_SCHEDULE(protothread_cap(&pt_cap));
         PT_SCHEDULE(protothread_cap_read(&pt_cap_read));
     }
+  
 }
 
 //Input Capture Event Interrupt
 void __ISR(_INPUT_CAPTURE_1_VECTOR, ipl2) IC1Handler(void)
 {
+    charge_time = mIC1ReadCapture();
+    CloseCapture1();
     mIC1ClearIntFlag();
+    
     charged = 1;
 }
