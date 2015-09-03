@@ -106,14 +106,15 @@ static PT_THREAD(protothread_cap_read(struct pt *pt)) {
             tft_setCursor(0,30);
             tft_setTextColor(ILI9340_YELLOW);
             tft_setTextSize(2);
-            //if (capacitance < 1 || capacitance > 99) {
-                //tft_writeString("Capacitor out of range!");
-            //}
-            //else {
+            if (capacitance < 1 || capacitance > 99) {
                 tft_fillRoundRect(0,30, 320, 40, 1, ILI9340_BLACK);// x,y,w,h,radius,color
-                sprintf(buffer, "%4.1f", capacitance);
-                tft_writeString(buffer); 
-            //}
+                tft_writeString("Capacitor out of range!");
+            }
+            else {
+                tft_fillRoundRect(0,30, 320, 40, 1, ILI9340_BLACK);// x,y,w,h,radius,color
+                sprintf(buffer, "%4.1f nF", capacitance);
+                tft_writeString(buffer);
+            }
             PT_YIELD_TIME_msec(200);
         }
     PT_END(pt);
