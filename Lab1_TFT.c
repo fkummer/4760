@@ -24,11 +24,11 @@ static PT_THREAD(protothread_blink(struct pt *pt)) {
     PT_BEGIN(pt);
         while(1) {
             //draw circle
-            tft_fillCircle(xc, yc, 4, ILI93240_GREEN);
+            tft_fillCircle(xc, yc, 4, ILI9340_GREEN);
             //yield time 1 second
             PT_YIELD_TIME_msec(1000);
             //erase circle
-            tft_fillCircle(xc, yc, 4, ILI93240_BLACK);
+            tft_fillCircle(xc, yc, 4, ILI9340_BLACK);
             //yield time 1 second
             PT_YIELD_TIME_msec(1000);
 	}
@@ -40,7 +40,7 @@ static PT_THREAD(protothread_cap_read(struct pt *pt)) {
     tft_setCursor(0,0);
     tft_setTextColor(ILI9340_WHITE);
     tft_setTextSize(3);
-    tft_writeString("Measuring capacitance:\n"    
+    tft_writeString("Measuring capacitance:\n");    
         while(1) {
             tft_setCursor(0,10);
             tft_setTextColor(ILI9340_YELLOW);
