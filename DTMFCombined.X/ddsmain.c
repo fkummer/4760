@@ -31,6 +31,11 @@
 char buffer[60];
 char DialBuffer[60];
 
+int PushState = NoPush;
+int DialArray[12];
+int ArrayPtr = 0;
+int CursorX = 3;
+
 // === thread structures ============================================
 // thread control structs
 // note that UART input and output are threads
@@ -49,10 +54,10 @@ volatile unsigned int DDS_amp;
 
 unsigned char sine_index_1;
 unsigned char sine_index_2;
-int frequency1 = 697;
-int frequency2 = 1209;
+int frequency1 = 0;
+int frequency2 = 0;
 float multiplier = 32.0;
-int ramping = 1;
+int ramping = 0;
 int sys_time_seconds;
 int cntr = 0;
 short sampled_value_1 = 0x0000;
@@ -138,31 +143,35 @@ inline void writeDAC(uint16_t data){
 
 
 
-void ramper(){
+int ramper(){
     cntr += 1;
     if(cntr > 0 && cntr <= 186){
         if(cntr%6==0){
             multiplier -= 1;
+            return 1;
         }
     }else{
         if(cntr>186 && cntr <= 3386){
             multiplier = 1;
+            return 1;
         }else{
             if(cntr>3386 && cntr <= 3572){
                 if(cntr%6==0){
                     multiplier += 1;
+                    return 1;
                 }
             }
         }
     }
     
     if(cntr > 3572 && cntr <= 6772){
-        
+        return 1;
     }
     
     if(cntr > 6772){
         cntr = 0;
         multiplier = 32.0;
+        return 0;
     }
           
 }
@@ -185,7 +194,13 @@ void __ISR(_TIMER_2_VECTOR, ipl2) Time2Handler(void)
     
     
     added_value = (sampled_value_1 + sampled_value_2)+1024;
-    ramper();
+    if(PushState == Pushed){
+        ramping = 1;
+    }
+    
+    if(ramping == 1){
+        ramping = ramper();
+    }
 
     writeDAC(0x3000 | added_value);
     // would need to pass sampled_value to DAC I think
@@ -194,39 +209,6 @@ void __ISR(_TIMER_2_VECTOR, ipl2) Time2Handler(void)
     mPORTBClearBits(BIT_0);
 }
 
-
-// === Command Thread ======================================================
-// The serial interface
-static char cmd[16]; 
-static int value;
-
-static PT_THREAD (protothread_cmd(struct pt *pt))
-{
-    PT_BEGIN(pt);
-      while(1) {
-          
-			// M = (fout*2^N)/fc
-			// 4294967296 = 2^32
-            
-			
-      } // END WHILE(1)
-  PT_END(pt);
-} // thread 3
-
-// update a 1 second tick counter, could be useful for real time if we need it
-static PT_THREAD (protothread_time(struct pt *pt))
-{
-    PT_BEGIN(pt);
-
-      while(1) {
-            // yield time 1 second
-            PT_YIELD_TIME_msec(1000);
-            sys_time_seconds++;
-            // NEVER exit while
-      } // END WHILE(1)
-
-  PT_END(pt);
-} // thread 
 
 // === Timer Thread =================================================
 // update a 1 second tick counter
@@ -326,10 +308,7 @@ static PT_THREAD (protothread_key(struct pt *pt))
   PT_END(pt);
 } // keypad thread
 
-int PushState = NoPush;
-int DialArray[12];
-int ArrayPtr = 0;
-int CursorX = 3;
+
 
 static PT_THREAD (protothread_key_state(struct pt *pt))
 {
@@ -375,8 +354,67 @@ static PT_THREAD (protothread_key_state(struct pt *pt))
           break;
 
        case Pushed:  
-          if (press > -1) PushState=Pushed; 
-          else PushState=MaybeNoPush;    
+          if (press > -1){ 
+              PushState=Pushed; 
+                switch(press){
+                    case 0:
+                      frequency1 = 941;
+                      frequency2 = 1336;
+                      break;
+                    case 1:
+                      frequency1 = 697;
+                      frequency2 = 1209;
+                      break;
+                    case 2:
+                      frequency1 = 697;
+                      frequency2 = 1336;
+                      break;
+                    case 3:
+                       frequency1 = 697;
+                       frequency2 = 1477;
+                       break;
+                    case 4:
+                      frequency1 = 770;
+                      frequency2 = 1209;
+                      break;
+                    case 5:
+                     frequency1 = 770;
+                     frequency2 = 1336;
+                     break;
+                    case 6:
+                     frequency1 = 770;
+                     frequency2 = 1477;
+                     break;
+                    case 7:
+                      frequency1 = 852;
+                      frequency2 = 1209;
+                      break;
+                    case 8:
+                      frequency1 = 852;
+                      frequency2 = 1336;
+                      break;
+                    case 9:
+                      frequency1 = 852;
+                      frequency2 = 1477;
+                      break;
+                    case 10:
+                      frequency1 = 941;
+                      frequency2 = 1209;
+                      break;
+                    case 11:
+                      frequency1 = 941;
+                      frequency2 = 1477;
+                      break;
+                    default:
+                       break;
+                }
+
+                DDS_increment_1 = (frequency1*4294967296)/32000;
+                DDS_increment_2 = (frequency2*4294967296)/32000;
+                          
+        }else{
+              PushState=MaybeNoPush;    
+          }
           break;
 
        case MaybeNoPush:
@@ -399,8 +437,6 @@ int main(void)
     CM1CON = 0; 
     CM2CON = 0;
     // timer two uses an internal clock source and runs at 32MHz
-    DDS_increment_1 = (frequency1*4294967296)/32000;
-    DDS_increment_2 = (frequency2*4294967296)/32000;
     OpenTimer2(T2_ON | T2_SOURCE_INT | T2_PS_1_32, 31);
     // Enable timer 2 interrupts with priority 2
     ConfigIntTimer2(T2_INT_ON | T2_INT_PRIOR_2);
