@@ -28,50 +28,52 @@
 
 void capacitor(void);
 
-volatile int charged;
-volatile float charge_time;
-float capacitance = 0.0;
+
+volatile int charged;  // Signals charging is complete
+volatile float charge_time; // Time taken for the capacitor to charge
+float capacitance = 0.0; // Value of capacitor in nF
 
 static struct pt pt_cap, pt_blink, pt_cap_read;
+
 //string buffer
 char buffer[60];
 static int xc=310, yc=230;
 
+
+// This thread is responsible for all the code not involving the TFT Display, it handled discharging and charging the capacitor and calculating the 
+// capacitance of the capacitor.
 static PT_THREAD(protothread_cap(struct pt *pt)){
     PT_BEGIN(pt);
         
     while(1){
-            // Discharge Capacitor
-        
+        // Discharge Capacitor
         // Set pin as output
         mPORTBSetPinsDigitalOut(BIT_3);    
-        //Drive RB3 low
+        // Drive RB3 low so capacitor can discharge into the pin
         mPORTBClearBits(BIT_3);
 
-        // Yield until discharge is complete
-        PT_YIELD_TIME_msec(2);
+        // Yield until discharge is complete 
+        PT_YIELD_TIME_msec(2); // 2ms is given for the capacitor to discharge and for the display to update if needed
         Comp1Setup();
-    // Charge Capacitor
-
+		
+		// Charge Capacitor
+		// Set RB3 as an input to detect capacitor's current charge
         mPORTBSetPinsDigitalIn(BIT_3); 
+		// Set up the timer for charging the capcitor
         capTimerSetup();
+		// Set up the input capture to capture when the capacitor voltage reaches the reference voltage
         IC1setup();
+		
         // Yield while waiting for event from comparator
         PT_YIELD_UNTIL(pt, charged);
         CloseTimer2();
         
-        
+		// Reset thread wait variable
         charged = 0;
 
-        // Calculate capacitance in nanofarads
+        // Calculate capacitance in nF
         capacitance =  (((charge_time*-1)/1000000)/(log(1-(VREF / VDD)) * RESISTOR))*1000000000;
 
-//        if(capacitance < 1){
-//            capacitance = 0;
-//        }  // Check if capacitance is non present
-//        else if(capacitance > 100){
-//            capacitance = 999;
-//        }  // Check if capacitance is out of range
         CMP1Close();
         PT_YIELD_TIME_msec(20);
     }
@@ -80,7 +82,7 @@ static PT_THREAD(protothread_cap(struct pt *pt)){
 
 
 
-
+// This thread blinks a circle on the display every second as a heartbeat
 static PT_THREAD(protothread_blink(struct pt *pt)) {
     PT_BEGIN(pt);
         while(1) {
@@ -96,6 +98,8 @@ static PT_THREAD(protothread_blink(struct pt *pt)) {
     PT_END(pt);
 }
 
+// This thead displays the value of the capcitor if it is in the 1nF-100nF range
+// or diplays a message if the capacitor is out of range
 static PT_THREAD(protothread_cap_read(struct pt *pt)) {
     PT_BEGIN(pt);
     tft_setCursor(0,0);
@@ -124,7 +128,9 @@ static PT_THREAD(protothread_cap_read(struct pt *pt)) {
 int main(int argc, char** argv) {
     PT_setup();
     
+	// Enable multivector interrupts
     INTEnableSystemMultiVectoredInt();
+	// Initialize threads
     PT_INIT(&pt_cap);
     
     
@@ -136,7 +142,10 @@ int main(int argc, char** argv) {
     tft_begin();
     tft_fillScreen(ILI9340_BLACK);
     
+	// Set orientation of the display
     tft_setRotation(1);
+	
+	// Set up pins
     PerPinSetup();
     while(1){
         PT_SCHEDULE(protothread_blink(&pt_blink));
@@ -146,7 +155,9 @@ int main(int argc, char** argv) {
   
 }
 
-//Input Capture Event Interrupt
+// Input Capture Event Interrupt
+// On input capture this interrupt will get the time taken to charge the capacitor
+// and signal the capacitor thread to continue
 void __ISR(_INPUT_CAPTURE_1_VECTOR, ipl2) IC1Handler(void)
 {
     charge_time = mIC1ReadCapture();
